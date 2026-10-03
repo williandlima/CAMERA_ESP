@@ -58,6 +58,7 @@ with sync_playwright() as p:
     ok(len(faces["faces"][0]["e"]["q"]) < 2000, "embedding quantizado compacto (%d chars)" % len(faces["faces"][0]["e"]["q"]))
     page.wait_for_function("fr.tracks.some(t => trackLabel(t) === 'Teste')", timeout=120000)
     ok(True, "rosto reconhecido como 'Teste'")
+    ok("mais parecido: Teste" in page.inner_text("#fr-status"), "status mostra similaridade para calibrar")
     sim = page.evaluate("fr.tracks[0].similarity")
     print("   similaridade: %.2f  real=%s live=%s" % (sim, page.evaluate("fr.tracks[0].real"), page.evaluate("fr.tracks[0].live")))
     time.sleep(6)

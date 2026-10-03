@@ -30,11 +30,12 @@ function loadPrefs() {
 function savePrefs(p) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (_) { /* modo privado */ }
 }
-const prefs = { threshold: 0.6, fps: 6, antispoof: true, recognize: true, showMotion: true, tab: 'faces', ...loadPrefs() };
-if ((prefs.v || 1) < 2) { prefs.threshold = Math.max(prefs.threshold, 0.6); prefs.v = 2; } // limiar antigo era permissivo demais
+const prefs = { threshold: 0.5, fps: 6, antispoof: true, recognize: true, showMotion: true, tab: 'faces', ...loadPrefs() };
+// v3: 0,50 é o limiar recomendado pela biblioteca (Human/FaceRes); 0,60 rejeitava a própria pessoa.
+if ((prefs.v || 1) < 3) { prefs.threshold = 0.5; prefs.v = 3; }
 
 // Critérios de reconhecimento (ver updateTracks)
-const MIN_FACE_SCORE = 0.6;  // qualidade mínima do rosto para tentar identificar
+const MIN_FACE_SCORE = 0.6;  // confiança mínima da detecção para tentar identificar
 const MIN_MARGIN = 0.06;     // vantagem mínima sobre a 2ª pessoa mais parecida
 const MAX_MISSED = 2;        // análises seguidas sem ver o rosto até apagar a caixa
 
@@ -397,7 +398,7 @@ function updateTracks(faces) {
     best.target = f.box.slice();
     best.seen = now;
     best.missed = 0;
-    const ok = f.match && f.score >= MIN_FACE_SCORE && f.match.similarity >= prefs.threshold &&
+    const ok = f.match && (f.boxScore ?? f.score) >= MIN_FACE_SCORE && f.match.similarity >= prefs.threshold &&
       f.match.similarity - (f.match.second || 0) >= MIN_MARGIN;
     best.votes.push(ok ? f.match.name : null);
     if (best.votes.length > 5) best.votes.shift();
@@ -479,7 +480,10 @@ function onWorkerMessage(ev) {
     updateTracks(m.faces);
     handleEnroll(m.enroll, m.faces.length);
     signalKnown();
-    frStatus.textContent = `Pronto · ${m.ms} ms por análise · ${m.faces.length} rosto(s)`;
+    // Diagnóstico para calibrar o limiar: pessoa cadastrada mais parecida e a similaridade.
+    const best = m.faces.reduce((a, f) => (f.match && (!a || f.match.similarity > a.similarity) ? f.match : a), null);
+    frStatus.textContent = `Pronto · ${m.ms} ms · ${m.faces.length} rosto(s)` +
+      (best ? ` · mais parecido: ${best.name} ${best.similarity.toFixed(2)} (mínimo ${prefs.threshold.toFixed(2)})` : '');
     // Ritmo adaptativo: respeita o fps escolhido e não ocupa mais de ~60% do tempo
     // (média móvel, para um quadro lento isolado não pausar o reconhecimento).
     const elapsed = performance.now() - fr.sentAt;

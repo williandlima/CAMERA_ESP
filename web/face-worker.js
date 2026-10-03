@@ -114,6 +114,7 @@ async function detect(msg) {
     const out = {
       box: f.boxRaw,
       score: f.score,
+      boxScore: f.boxScore,
       real: f.real,
       live: f.live,
       size: f.box ? f.box[2] : 0,
