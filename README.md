@@ -27,3 +27,6 @@ pip install -r requirements.txt
 python recognize.py --host <IP_DA_PLACA> --password <WEB_PASSWORD> [--serve]
 ```
 `--serve` publica o vídeo anotado em `http://<ip-do-pc>:5000/` (senha = WEB_PASSWORD). Os modelos ONNX são baixados na primeira execução.
+
+## Reconhecimento facial na página web
+A página detecta rostos (face-api.js, carregado por CDN — o navegador precisa de internet), escreve o nome sobre o vídeo e permite cadastrar rostos: digite o nome e clique em "Cadastrar rosto da imagem". Os descritores ficam em `/faces.json` (LittleFS) na placa, compartilhados entre aparelhos. Cadastre 2-3 vezes por pessoa, em ângulos diferentes.

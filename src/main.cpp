@@ -6,6 +6,7 @@
 #include <esp_random.h>
 #include <esp_http_server.h>
 #include <Preferences.h>
+#include <LittleFS.h>
 #include <time.h>
 #include "config.h"
 #include "secrets.h"
@@ -263,6 +264,27 @@ static void handleSettings() {
   server.send(200, "application/json", String("{\"capture\":") + (captureEnabled ? "true" : "false") + "}");
 }
 
+// rostos cadastrados (descritores gerados no navegador), guardados em /faces.json
+static void handleFacesGet() {
+  if (!requireAuth()) return;
+  File f = LittleFS.open("/faces.json", "r");
+  if (!f) { server.send(200, "application/json", "[]"); return; }
+  server.sendHeader("Cache-Control", "no-store");
+  server.streamFile(f, "application/json");
+  f.close();
+}
+
+static void handleFacesPost() {
+  if (!requireAuth()) return;
+  String b = server.arg("plain");
+  if (b.length() < 2 || b.length() > 60000 || b[0] != '[') { server.send(400, "text/plain", "invalido"); return; }
+  File f = LittleFS.open("/faces.json", "w");
+  if (!f) { server.send(500, "text/plain", "falha ao gravar"); return; }
+  f.print(b);
+  f.close();
+  server.send(200, "application/json", "{}");
+}
+
 static void handleEvent() {
   if (!requireAuth()) return;
   uint32_t id = server.arg("id").toInt();
@@ -283,6 +305,7 @@ void setup() {
   Serial.begin(115200);
   mtx = xSemaphoreCreateMutex();
   prefs.begin("cam", false);
+  LittleFS.begin(true);
   captureEnabled = prefs.getBool("capture", true);
   if (!psramFound() || !initCamera()) { Serial.println("Falha na camera/PSRAM"); delay(5000); ESP.restart(); }
   prevFrame = (uint8_t *)ps_malloc(MW * MH * 2);
@@ -309,6 +332,8 @@ void setup() {
   server.on("/live.jpg", HTTP_GET, handleLive);
   server.on("/events", HTTP_GET, handleEvents);
   server.on("/settings", HTTP_POST, handleSettings);
+  server.on("/faces", HTTP_GET, handleFacesGet);
+  server.on("/faces", HTTP_POST, handleFacesPost);
   server.on("/event.jpg", HTTP_GET, handleEvent);
   server.begin();
   startStreamServer();
