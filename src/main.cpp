@@ -4,6 +4,7 @@
 #include <esp_camera.h>
 #include <img_converters.h>
 #include <esp_random.h>
+#include <esp_http_server.h>
 #include <time.h>
 #include "config.h"
 #include "secrets.h"
@@ -20,6 +21,7 @@ static Snap snaps[MAX_SNAPSHOTS];
 static uint32_t snapCounter = 0;
 static uint8_t *liveBuf = nullptr;
 static size_t liveLen = 0, liveCap = 0;
+static volatile uint32_t liveSeq = 0;
 static SemaphoreHandle_t mtx;
 static volatile bool motionNow = false;
 static volatile int motionPct = 0;
@@ -105,29 +107,32 @@ static void captureTask(void *) {
       liveBuf = (uint8_t *)ps_malloc(fb->len + 16384);
       liveCap = liveBuf ? fb->len + 16384 : 0;
     }
-    if (liveBuf && fb->len <= liveCap) { memcpy(liveBuf, fb->buf, fb->len); liveLen = fb->len; }
+    if (liveBuf && fb->len <= liveCap) { memcpy(liveBuf, fb->buf, fb->len); liveLen = fb->len; liveSeq++; }
     xSemaphoreGive(mtx);
-    detectMotion(fb->buf, fb->len);
+    static uint8_t n = 0;
+    if ((++n & 1) == 0) detectMotion(fb->buf, fb->len);   // detecta a cada 2 quadros
     esp_camera_fb_return(fb);
-    vTaskDelay(pdMS_TO_TICKS(60));
+    vTaskDelay(1);
   }
 }
 
 // ---------- autenticação ----------
-static String cookieToken() {
-  String c = server.header("Cookie");
+static String tokenFrom(const String &c) {
   int i = c.indexOf("sid=");
   if (i < 0) return "";
   int e = c.indexOf(';', i);
   return c.substring(i + 4, e < 0 ? c.length() : e);
 }
 
-static bool authed() {
-  String t = cookieToken();
+static String cookieToken() { return tokenFrom(server.header("Cookie")); }
+
+static bool tokenValid(const String &t) {
   if (t.length() < 16) return false;
   for (auto &s : sessions) if (s.length() && s == t) return true;
   return false;
 }
+
+static bool authed() { return tokenValid(cookieToken()); }
 
 static bool requireAuth() {
   if (authed()) return true;
@@ -176,8 +181,54 @@ static void handleLive() {
   if (!requireAuth()) return;
   xSemaphoreTake(mtx, portMAX_DELAY);
   if (!liveLen) { xSemaphoreGive(mtx); server.send(503, "text/plain", "sem imagem"); return; }
-  sendJpeg(liveBuf, liveLen);   // mantém o mutex durante o envio (frame consistente)
+  sendJpeg(liveBuf, liveLen);
   xSemaphoreGive(mtx);
+}
+
+// ---------- stream MJPEG (porta 81, servidor próprio) ----------
+static esp_err_t streamHandler(httpd_req_t *req) {
+  String cookie;
+  size_t cl = httpd_req_get_hdr_value_len(req, "Cookie");
+  if (cl) {
+    char *b = (char *)malloc(cl + 1);
+    if (b) { httpd_req_get_hdr_value_str(req, "Cookie", b, cl + 1); cookie = b; free(b); }
+  }
+  if (!tokenValid(tokenFrom(cookie))) {
+    httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Nao autorizado");
+    return ESP_OK;
+  }
+  httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
+  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+  uint8_t *buf = nullptr; size_t cap = 0; uint32_t seq = 0;
+  for (;;) {
+    xSemaphoreTake(mtx, portMAX_DELAY);
+    if (!liveLen || liveSeq == seq) { xSemaphoreGive(mtx); vTaskDelay(pdMS_TO_TICKS(8)); continue; }
+    if (liveLen > cap) {
+      free(buf); cap = liveLen + 16384;
+      buf = (uint8_t *)ps_malloc(cap);
+      if (!buf) { xSemaphoreGive(mtx); return ESP_FAIL; }
+    }
+    size_t len = liveLen; memcpy(buf, liveBuf, len); seq = liveSeq;
+    xSemaphoreGive(mtx);
+    char h[80];
+    int n = snprintf(h, sizeof(h), "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", (unsigned)len);
+    if (httpd_resp_send_chunk(req, h, n) != ESP_OK ||
+        httpd_resp_send_chunk(req, (const char *)buf, len) != ESP_OK ||
+        httpd_resp_send_chunk(req, "\r\n", 2) != ESP_OK) break;
+  }
+  free(buf);
+  return ESP_OK;
+}
+
+static void startStreamServer() {
+  httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
+  cfg.server_port = 81;
+  cfg.ctrl_port = 32769;
+  cfg.stack_size = 8192;
+  cfg.max_open_sockets = 3;
+  httpd_uri_t u = {"/stream", HTTP_GET, streamHandler, nullptr};
+  httpd_handle_t h = nullptr;
+  if (httpd_start(&h, &cfg) == ESP_OK) httpd_register_uri_handler(h, &u);
 }
 
 static void handleEvents() {
@@ -245,6 +296,7 @@ void setup() {
   server.on("/events", HTTP_GET, handleEvents);
   server.on("/event.jpg", HTTP_GET, handleEvent);
   server.begin();
+  startStreamServer();
 
   xTaskCreatePinnedToCore(captureTask, "cap", 8192, nullptr, 2, nullptr, 0);
 }

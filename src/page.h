@@ -27,7 +27,8 @@ header{display:flex;justify-content:space-between;align-items:center}a{color:#8a
 <h3>Movimentos detectados</h3><div class="g" id="g"></div>
 <script>
 const live=document.getElementById('live');
-function frame(){live.onload=live.onerror=()=>setTimeout(frame,150);live.src='/live.jpg?'+Date.now()}frame();
+function start(){live.src='http://'+location.hostname+':81/stream?'+Date.now()}
+live.onerror=()=>setTimeout(start,2000);start();
 let last=0;
 async function poll(){try{const r=await fetch('/events');if(r.status==401)return location.reload();
 const d=await r.json();const st=document.getElementById('st');
