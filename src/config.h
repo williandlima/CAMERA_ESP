@@ -1,6 +1,12 @@
+// Configuração fixa de hardware e valores padrão.
+// Ajustes de câmera/movimento podem ser alterados pela página e ficam salvos na placa.
 #pragma once
 
-// Pinagem GOOUUU ESP32-S3-CAM (OV2640/OV5640)
+#ifndef FW_VERSION
+#define FW_VERSION "2.0.0"
+#endif
+
+// ---------- Pinagem GOOUUU ESP32-S3-CAM (OV2640/OV5640) ----------
 #define PWDN_GPIO_NUM  -1
 #define RESET_GPIO_NUM -1
 #define XCLK_GPIO_NUM  15
@@ -17,30 +23,33 @@
 #define VSYNC_GPIO_NUM 6
 #define HREF_GPIO_NUM  7
 #define PCLK_GPIO_NUM  13
+#define CAM_XCLK_HZ    20000000
 
-// Cartão SD (SD_MMC 1-bit) – opcional
+// ---------- Cartão SD (SD_MMC 1-bit) – opcional ----------
 #define USE_SD         1
 #define SD_CLK_PIN     39
 #define SD_CMD_PIN     38
 #define SD_D0_PIN      40
+#define SD_DIR         "/motion"
+#define SD_MAX_USED_PCT 90          // apaga as gravações mais antigas acima disso
 
-// Detecção de movimento
-#define MOTION_PIXEL_THRESHOLD 40   // variação mínima por pixel (soma dos 2 bytes RGB565)
-#define MOTION_AREA_PERCENT    3    // % de pixels alterados para disparar
-#define MOTION_COOLDOWN_MS     5000 // intervalo mínimo entre prints
-#define MOTION_WARMUP_FRAMES   10   // quadros ignorados após boot
+// ---------- LED RGB (WS2812) ----------
+#define LED_PIN        48
 
-#define MAX_SNAPSHOTS  8            // prints guardados na PSRAM
-#define SESSION_MAX    4            // sessões simultâneas
+// ---------- Rede ----------
+#define HOSTNAME       "esp32cam"   // http://esp32cam.local/
+#define HTTP_PORT      80
+#define STREAM_PORT    81
+#define STREAM_MAX_CLIENTS 3
 #define TZ_INFO        "<-03>3"     // Brasília
+#define NTP_SERVER_1   "pool.ntp.org"
+#define NTP_SERVER_2   "time.google.com"
 
-// LED RGB (WS2812) da placa
-#define LED_PIN        48           // GOOUUU ESP32-S3-CAM: GPIO48
-#define LED_BRIGHT     25           // 0-255
-#define KNOWN_HOLD_MS  5000         // tempo em verde após ver rosto conhecido
+// ---------- Sessões ----------
+#define SESSION_IDLE_MS  (7UL * 24 * 3600 * 1000)   // 7 dias sem uso
+#define SESSION_MAX_MS   (30UL * 24 * 3600 * 1000)  // 30 dias no máximo
 
-// Desempenho do vídeo. QVGA é bem mais fluido pelo Wi-Fi; para mais nitidez use FRAMESIZE_VGA
-// (então MOTION_JPG_SCALE deve ser JPG_SCALE_8X; QVGA usa JPG_SCALE_4X; a área de análise fica 80x60).
-#define CAM_FRAMESIZE      FRAMESIZE_QVGA
-#define CAM_JPEG_QUALITY   10          // 0-63, maior = mais compressão e menos banda
-#define MOTION_JPG_SCALE   JPG_SCALE_4X
+// ---------- Memória ----------
+#define MAX_SNAPSHOTS    12         // prints mantidos na PSRAM (galeria)
+#define MOTION_MAX_WIDTH 160        // largura máxima da imagem analisada
+#define FACES_MAX_BYTES  (512 * 1024)

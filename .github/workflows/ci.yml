@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - name: Instalar PlatformIO
+        run: pip install --upgrade platformio
+      - name: Testes da logica pura
+        run: pio test -e native
+      - name: Compilar firmware
+        run: |
+          cp src/secrets.h.example src/secrets.h
+          pio run -e goouuu_esp32s3_cam
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/goouuu_esp32s3_cam/firmware.bin
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sintaxe JS
+        run: for f in web/*.js; do node --check "$f"; done

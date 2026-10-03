@@ -84,9 +84,14 @@ def frames(host, password):
     while True:
         try:
             s = requests.Session()
-            r = s.post(f"http://{host}/login", data={"password": password}, allow_redirects=False, timeout=8)
-            if "sid" not in s.cookies:
-                sys.exit("Senha incorreta (ou placa bloqueou por 60 s).")
+            r = s.post(f"http://{host}/api/login", json={"password": password}, timeout=8)
+            if r.status_code == 429:
+                wait = int(r.headers.get("Retry-After", "10"))
+                print(f"Muitas tentativas; aguardando {wait} s")
+                time.sleep(wait)
+                continue
+            if r.status_code != 200 or "sid" not in s.cookies:
+                sys.exit("Senha incorreta.")
             resp = s.get(f"http://{host}:81/stream", stream=True, timeout=10)
             buf = b""
             for chunk in resp.iter_content(4096):

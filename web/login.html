@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Monitor ESP32-CAM</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="login">
+<form id="f" class="card login-card" autocomplete="on">
+  <h1>Monitor de ambiente</h1>
+  <label for="pw">Senha</label>
+  <input id="pw" type="password" name="password" autocomplete="current-password" required autofocus>
+  <button type="submit" id="btn">Entrar</button>
+  <p id="err" class="err" role="alert" hidden></p>
+</form>
+<script>
+'use strict';
+const f = document.getElementById('f'), err = document.getElementById('err'), btn = document.getElementById('btn');
+let lockTimer = null;
+function lock(sec) {
+  btn.disabled = true;
+  clearInterval(lockTimer);
+  lockTimer = setInterval(() => {
+    if (--sec <= 0) { clearInterval(lockTimer); btn.disabled = false; err.hidden = true; return; }
+    err.textContent = `Muitas tentativas. Aguarde ${sec} s.`;
+  }, 1000);
+  err.textContent = `Muitas tentativas. Aguarde ${sec} s.`;
+  err.hidden = false;
+}
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: f.password.value }),
+    });
+    if (r.ok) { location.href = '/'; return; }
+    if (r.status === 429) { lock(parseInt(r.headers.get('Retry-After') || '5', 10)); return; }
+    err.textContent = 'Senha incorreta'; err.hidden = false;
+  } catch (_) {
+    err.textContent = 'Sem conexão com a câmera'; err.hidden = false;
+  }
+  btn.disabled = false;
+  f.password.select();
+});
+</script>
+</body>
+</html>
