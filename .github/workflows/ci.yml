@@ -41,3 +41,31 @@ jobs:
           node-version: 20
       - name: Sintaxe JS
         run: for f in web/*.js; do node --check "$f"; done
+
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Dependencias
+        run: |
+          npm install --prefix test/web @vladmandic/human@3.3.6
+          pip install playwright pillow
+          python -m playwright install --with-deps chromium
+          python test/web/make_scenes.py
+      - name: Teste ponta a ponta da interface
+        run: |
+          sudo -E env "PATH=$PATH" python test/web/mock_server.py web test/web/node_modules/@vladmandic/human > mock.log 2>&1 &
+          sleep 3
+          SHOTS_DIR=$PWD python test/web/ui_test.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: "*.png"

@@ -16,7 +16,7 @@ input[type=range] { width: 100%; }
 label { display: block; margin: 10px 0; color: var(--muted); font-size: .9rem; }
 label output { float: right; color: var(--text); font-variant-numeric: tabular-nums; }
 label.check { display: flex; gap: 8px; align-items: center; color: var(--text); }
-.muted { color: var(--muted); font-size: .85rem; }
+.muted { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
 .row { display: flex; gap: 8px; align-items: center; }
 .err { color: var(--bad); }
@@ -32,8 +32,16 @@ label.check { display: flex; gap: 8px; align-items: center; color: var(--text); 
 .chip.bad { border-color: var(--bad); color: var(--bad); }
 .chip.alert { background: var(--bad); border-color: var(--bad); color: #fff; }
 
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
-@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "video side" "gallery side"; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.video-col { grid-area: video; } .side { grid-area: side; } .gallery-col { grid-area: gallery; }
+.gallery-col h2 { margin-top: 0; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "video" "side" "gallery"; padding: 10px; gap: 12px; }
+  .side { position: static; }
+  .top { padding: 8px 10px; }
+  .top h1 { flex: 1; }
+  .chips { order: 3; flex-basis: 100%; }
+}
 
 .video { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; aspect-ratio: 4 / 3; }
 .video img { width: 100%; height: 100%; object-fit: contain; display: block; }

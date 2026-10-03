@@ -3,3 +3,7 @@
 src/secrets.h
 src/generated/
 recognizer/models/
+test/web/node_modules/
+test/web/*.jpg
+test/web/*.png
+test/web/package*.json

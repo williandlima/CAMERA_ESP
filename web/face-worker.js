@@ -15,7 +15,7 @@ const config = (base) => ({
   backend: 'webgl',
   modelBasePath: `${base}/models/`,
   cacheSensitivity: 0,
-  warmup: 'none',
+  warmup: 'face',
   filter: { enabled: false },
   face: {
     enabled: true,
@@ -37,7 +37,12 @@ const config = (base) => ({
 
 async function init(msg) {
   const base = msg.base || `https://cdn.jsdelivr.net/npm/@vladmandic/human@${HUMAN_VERSION}`;
-  importScripts(`${base}/dist/human.js`);
+  try {
+    importScripts(`${base}/dist/human.js`);
+  } catch (_) {
+    postMessage({ type: 'fatal', message: 'não foi possível baixar a biblioteca de reconhecimento (o aparelho está sem internet?)' });
+    return;
+  }
   const H = Human.Human || Human.default;
   for (const backend of ['webgl', 'wasm', 'cpu']) {
     try {
@@ -45,11 +50,13 @@ async function init(msg) {
       await human.load();
       await human.init();
       if (human.tf.getBackend() !== backend) throw new Error(`backend ${backend} indisponível`);
+      postMessage({ type: 'loading', message: 'preparando modelos…' });
+      await human.warmup(); // compila shaders antes da 1ª análise real
       postMessage({ type: 'ready', backend });
       return;
     } catch (e) {
       human = null;
-      if (backend === 'cpu') postMessage({ type: 'error', message: String(e && e.message ? e.message : e) });
+      if (backend === 'cpu') postMessage({ type: 'fatal', message: `falha ao carregar modelos: ${e && e.message ? e.message : e}` });
     }
   }
 }

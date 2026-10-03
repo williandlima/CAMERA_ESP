@@ -304,7 +304,7 @@ async function loadFaces() {
 async function saveFaces() {
   const faces = fr.db.map((f) => ({ name: f.name, e: encodeEmb(f.emb) }));
   await postJson('/api/faces', { v: 2, model: 'human-faceres', faces });
-  fr.worker.postMessage({ type: 'db', faces: fr.db });
+  if (fr.worker) fr.worker.postMessage({ type: 'db', faces: fr.db });
   renderPeople();
 }
 
@@ -351,6 +351,7 @@ function handleEnroll(cand) {
   if (cand.score < 0.6 || cand.box[2] < 0.08) { frMsg.textContent = 'Aproxime-se e fique de frente para a câmera.'; return; }
   en.samples.push(cand.emb);
   en.next = Date.now() + 350; // espaça as amostras para variar o ângulo
+  en.deadline = Date.now() + 15000; // progresso renova o prazo (aparelhos lentos)
   frMsg.textContent = `Capturando ${en.samples.length}/${en.need}…`;
   if (en.samples.length >= en.need) {
     fr.enroll = null;
@@ -391,8 +392,10 @@ function updateTracks(faces) {
     best.votes.push(ok ? f.match.name : null);
     if (best.votes.length > 5) best.votes.shift();
     best.similarity = f.match ? f.match.similarity : 0;
-    best.real = f.real;
-    best.live = f.live;
+    // antifraude oscila quadro a quadro em baixa resolução: média móvel por pessoa
+    const ema = (old, v) => (v == null ? old : old == null ? v : old * 0.7 + v * 0.3);
+    best.real = ema(best.real, f.real);
+    best.live = ema(best.live, f.live);
   }
   fr.tracks = fr.tracks.filter((t) => now - t.seen < 1500);
 }
@@ -405,7 +408,8 @@ function trackLabel(t) {
   return n * 2 >= t.votes.length ? name : null;
 }
 
-const isGenuine = (t) => !prefs.antispoof || ((t.real ?? 1) >= 0.5 && (t.live ?? 1) >= 0.5);
+const SPOOF_MIN = 0.4;
+const isGenuine = (t) => !prefs.antispoof || ((t.real ?? 1) >= SPOOF_MIN && (t.live ?? 1) >= SPOOF_MIN);
 
 function signalKnown() {
   const now = Date.now();
@@ -419,6 +423,7 @@ function scheduleAnalysis(delay) { setTimeout(analyze, delay); }
 
 async function analyze() {
   const minInterval = 1000 / prefs.fps;
+  if (!fr.worker) return; // reiniciado por startFaceWorker
   if (!fr.ready || !frOn.checked || document.hidden || !live.naturalWidth || fr.busy) {
     scheduleAnalysis(300);
     return;
@@ -447,7 +452,9 @@ async function analyze() {
 
 function onWorkerMessage(ev) {
   const m = ev.data;
-  if (m.type === 'ready') {
+  if (m.type === 'loading') {
+    frStatus.textContent = m.message;
+  } else if (m.type === 'ready') {
     fr.ready = true;
     frStatus.textContent = `Pronto (${m.backend.toUpperCase()}).`;
     fr.worker.postMessage({ type: 'db', faces: fr.db });
@@ -458,9 +465,18 @@ function onWorkerMessage(ev) {
     handleEnroll(m.enroll);
     signalKnown();
     frStatus.textContent = `Pronto · ${m.ms} ms por análise · ${m.faces.length} rosto(s)`;
-    // Ritmo adaptativo: respeita o fps escolhido e nunca ocupa mais de ~60% do tempo.
+    // Ritmo adaptativo: respeita o fps escolhido e não ocupa mais de ~60% do tempo
+    // (média móvel, para um quadro lento isolado não pausar o reconhecimento).
     const elapsed = performance.now() - fr.sentAt;
-    scheduleAnalysis(Math.max(fr.minInterval - elapsed, elapsed * 0.6, 0));
+    fr.avgMs = fr.avgMs ? fr.avgMs * 0.8 + elapsed * 0.2 : elapsed;
+    scheduleAnalysis(Math.min(Math.max(fr.minInterval - elapsed, fr.avgMs * 0.6, 0), 1500));
+  } else if (m.type === 'fatal') {
+    // Sem internet/CDN: tenta de novo em 30 s, sem recarregar a página.
+    frStatus.textContent = `Reconhecimento indisponível: ${m.message}. Nova tentativa em 30 s.`;
+    fr.worker.terminate();
+    fr.worker = null;
+    fr.ready = false;
+    setTimeout(startFaceWorker, 30000);
   } else if (m.type === 'error') {
     fr.busy = false;
     frStatus.textContent = `Erro no reconhecimento: ${m.message}`;
@@ -475,7 +491,14 @@ function startFaceWorker() {
   }
   fr.worker = new Worker('/face-worker.js');
   fr.worker.onmessage = onWorkerMessage;
-  fr.worker.onerror = (e) => { frStatus.textContent = `Falha ao carregar modelos (precisa de internet): ${e.message || ''}`; };
+  fr.worker.onerror = (e) => {
+    e.preventDefault();
+    frStatus.textContent = 'Falha no módulo de reconhecimento. Nova tentativa em 30 s.';
+    if (fr.worker) fr.worker.terminate();
+    fr.worker = null;
+    fr.ready = false;
+    setTimeout(startFaceWorker, 30000);
+  };
   const base = new URLSearchParams(location.search).get('humanBase'); // permite modelos locais/espelho
   fr.worker.postMessage({ type: 'init', base: base || undefined });
 }
