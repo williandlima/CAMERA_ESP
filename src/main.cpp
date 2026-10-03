@@ -201,6 +201,15 @@ static esp_err_t streamHandler(httpd_req_t *req) {
     httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Nao autorizado");
     return ESP_OK;
   }
+  // CORS com credenciais: a página (porta 80) lê o quadro do stream num canvas
+  size_t ol = httpd_req_get_hdr_value_len(req, "Origin");
+  if (ol) {
+    static char origin[96];
+    if (ol < sizeof(origin) && httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
+      httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", origin);
+      httpd_resp_set_hdr(req, "Access-Control-Allow-Credentials", "true");
+    }
+  }
   httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   uint8_t *buf = nullptr; size_t cap = 0; uint32_t seq = 0;

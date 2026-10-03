@@ -38,7 +38,7 @@ button.x{background:#555;padding:2px 8px}.c{background:#1c1c1c;border-radius:8px
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 <script>
 const $=id=>document.getElementById(id),live=$('live'),ov=$('ov'),snap=new Image();
-function start(){live.src='http://'+location.hostname+':81/stream?'+Date.now()}
+function start(){live.crossOrigin='use-credentials';live.src='http://'+location.hostname+':81/stream?'+Date.now()}
 live.onerror=()=>setTimeout(start,2000);start();
 let last=0;
 $('cap').onchange=e=>fetch('/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'capture='+(e.target.checked?1:0)});
@@ -63,6 +63,7 @@ $('lst').onclick=async e=>{const n=e.target.dataset.n;if(!n)return;faces=faces.f
 $('en').onclick=async()=>{const n=$('nm').value.trim().replace(/[^\w ]/g,'');
 if(!ready)return $('msg').textContent='Modelos ainda carregando';
 if(!n)return $('msg').textContent='Digite um nome';
+await full();
 if(!res.length)return $('msg').textContent='Nenhum rosto na imagem';
 const big=res.reduce((a,b)=>a.detection.box.area>b.detection.box.area?a:b);
 faces.push({name:n,d:Array.from(big.descriptor).map(x=>+x.toFixed(4))});
@@ -71,17 +72,27 @@ async function init(){try{
 await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MODELS),faceapi.nets.faceLandmark68Net.loadFromUri(MODELS),faceapi.nets.faceRecognitionNet.loadFromUri(MODELS)]);
 faces=await (await fetch('/faces')).json();rebuild();ready=true;$('fs').textContent='pronto';detect()}
 catch(e){$('fs').textContent='falha ao carregar modelos (o navegador precisa de internet)'}}
+const cv=document.createElement('canvas');cv.width=320;cv.height=240;const cx=cv.getContext('2d');
+const opt=()=>new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:0.5});
+let labels=[],lastFull=0;
+async function full(){cx.drawImage(live,0,0,320,240);
+res=await faceapi.detectAllFaces(cv,opt()).withFaceLandmarks().withFaceDescriptors();
+labels=res.map(r=>{const b=r.detection.box;let name='Desconhecido',ok=false;
+if(matcher){const m=matcher.findBestMatch(r.descriptor);if(m.label!=='unknown'){name=m.label+' '+m.distance.toFixed(2);ok=true}}
+return{x:b.x+b.width/2,y:b.y+b.height/2,name,ok}});lastFull=Date.now()}
 async function detect(){
 const ctx=ov.getContext('2d');
-if(!$('fr').checked||!live.naturalWidth){ctx.clearRect(0,0,ov.width,ov.height);res=[];return setTimeout(detect,500)}
-try{const b=await (await fetch('/live.jpg?'+Date.now())).blob();const u=URL.createObjectURL(b);snap.src=u;await snap.decode();URL.revokeObjectURL(u);
-res=await faceapi.detectAllFaces(snap,new faceapi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:0.5})).withFaceLandmarks().withFaceDescriptors();
-ov.width=live.clientWidth;ov.height=live.clientHeight;const k=ov.width/snap.naturalWidth;ctx.clearRect(0,0,ov.width,ov.height);ctx.lineWidth=2;ctx.font='bold 15px system-ui';
-for(const r of res){const bx=r.detection.box;let name='Desconhecido',ok=false;
-if(matcher){const m=matcher.findBestMatch(r.descriptor);if(m.label!=='unknown'){name=m.label+' '+m.distance.toFixed(2);ok=true}}
-const c=ok?'#2c4':'#e33';ctx.strokeStyle=c;ctx.strokeRect(bx.x*k,bx.y*k,bx.width*k,bx.height*k);
-const w=ctx.measureText(name).width+8;ctx.fillStyle=c;ctx.fillRect(bx.x*k,bx.y*k-22,w,22);ctx.fillStyle='#fff';ctx.fillText(name,bx.x*k+4,bx.y*k-6)}
-}catch(e){}
-setTimeout(detect,30)}
+if(!$('fr').checked||!live.naturalWidth||document.hidden){ctx.clearRect(0,0,ov.width,ov.height);res=[];return setTimeout(detect,500)}
+try{let boxes;
+if(Date.now()-lastFull>1000){await full();boxes=res.map(r=>r.detection.box)}
+else{cx.drawImage(live,0,0,320,240);boxes=(await faceapi.detectAllFaces(cv,opt())).map(d=>d.box)}
+ov.width=live.clientWidth;ov.height=live.clientHeight;const k=ov.width/320;ctx.clearRect(0,0,ov.width,ov.height);ctx.lineWidth=2;ctx.font='bold 15px system-ui';
+for(const bx of boxes){let l=null,dm=1e9;for(const q of labels){const d=Math.hypot(q.x-(bx.x+bx.width/2),q.y-(bx.y+bx.height/2));if(d<dm){dm=d;l=q}}
+if(!l||dm>bx.width)l={name:'...',ok:false};
+const c=l.ok?'#2c4':'#e33';ctx.strokeStyle=c;ctx.strokeRect(bx.x*k,bx.y*k,bx.width*k,bx.height*k);
+const w=ctx.measureText(l.name).width+8;ctx.fillStyle=c;ctx.fillRect(bx.x*k,bx.y*k-22,w,22);ctx.fillStyle='#fff';ctx.fillText(l.name,bx.x*k+4,bx.y*k-6)}
+$('fs').textContent='pronto'}
+catch(e){$('fs').textContent='erro: '+e.message;return setTimeout(detect,2000)}
+setTimeout(detect,0)}
 window.addEventListener('load',init);
 </script></body></html>)HTML";
