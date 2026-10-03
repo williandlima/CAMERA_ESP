@@ -50,8 +50,8 @@ static bool initCamera() {
   c.pin_pwdn = PWDN_GPIO_NUM; c.pin_reset = RESET_GPIO_NUM;
   c.xclk_freq_hz = 20000000;
   c.pixel_format = PIXFORMAT_JPEG;
-  c.frame_size = FRAMESIZE_VGA;   // 640x480 -> 80x60 com escala 1/8
-  c.jpeg_quality = 12;
+  c.frame_size = CAM_FRAMESIZE;
+  c.jpeg_quality = CAM_JPEG_QUALITY;
   c.fb_count = 2;
   c.fb_location = CAMERA_FB_IN_PSRAM;
   c.grab_mode = CAMERA_GRAB_LATEST;
@@ -87,7 +87,7 @@ static void saveSnapshot(const uint8_t *jpg, size_t len) {
 }
 
 static void detectMotion(const uint8_t *jpg, size_t len) {
-  if (!jpg2rgb565(jpg, len, curFrame, JPG_SCALE_8X)) return;
+  if (!jpg2rgb565(jpg, len, curFrame, MOTION_JPG_SCALE)) return;
   if (warmup > 0) { warmup--; memcpy(prevFrame, curFrame, MW * MH * 2); return; }
   int changed = 0;
   for (int i = 0; i < MW * MH; i++) {
@@ -116,7 +116,7 @@ static void captureTask(void *) {
     if (liveBuf && fb->len <= liveCap) { memcpy(liveBuf, fb->buf, fb->len); liveLen = fb->len; liveSeq++; }
     xSemaphoreGive(mtx);
     static uint8_t n = 0;
-    if ((++n & 1) == 0) detectMotion(fb->buf, fb->len);   // detecta a cada 2 quadros
+    if ((++n % 3) == 0) detectMotion(fb->buf, fb->len);   // detecta a cada 3 quadros
     esp_camera_fb_return(fb);
     vTaskDelay(1);
   }
@@ -365,7 +365,7 @@ void setup() {
   server.begin();
   startStreamServer();
 
-  xTaskCreatePinnedToCore(captureTask, "cap", 8192, nullptr, 2, nullptr, 0);
+  xTaskCreatePinnedToCore(captureTask, "cap", 8192, nullptr, 2, nullptr, 1);   // core 0 fica livre p/ Wi-Fi
 }
 
 void loop() {

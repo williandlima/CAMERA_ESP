@@ -38,3 +38,9 @@
 #define LED_PIN        48           // GOOUUU ESP32-S3-CAM: GPIO48
 #define LED_BRIGHT     25           // 0-255
 #define KNOWN_HOLD_MS  5000         // tempo em verde após ver rosto conhecido
+
+// Desempenho do vídeo. QVGA é bem mais fluido pelo Wi-Fi; para mais nitidez use FRAMESIZE_VGA
+// (então MOTION_JPG_SCALE deve ser JPG_SCALE_8X; QVGA usa JPG_SCALE_4X; a área de análise fica 80x60).
+#define CAM_FRAMESIZE      FRAMESIZE_QVGA
+#define CAM_JPEG_QUALITY   10          // 0-63, maior = mais compressão e menos banda
+#define MOTION_JPG_SCALE   JPG_SCALE_4X

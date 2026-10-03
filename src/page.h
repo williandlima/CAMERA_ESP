@@ -82,10 +82,10 @@ if(matcher){const m=matcher.findBestMatch(r.descriptor);if(m.label!=='unknown'){
 return{x:b.x+b.width/2,y:b.y+b.height/2,name,ok}});lastFull=Date.now();
 if(labels.some(l=>l.ok))fetch('/known',{method:'POST'}).catch(()=>{})}
 async function detect(){
-const ctx=ov.getContext('2d');
+const t0=performance.now();const ctx=ov.getContext('2d');
 if(!$('fr').checked||!live.naturalWidth||document.hidden){ctx.clearRect(0,0,ov.width,ov.height);res=[];return setTimeout(detect,500)}
 try{let boxes;
-if(Date.now()-lastFull>1000){await full();boxes=res.map(r=>r.detection.box)}
+if(Date.now()-lastFull>1500){await full();boxes=res.map(r=>r.detection.box)}
 else{cx.drawImage(live,0,0,320,240);boxes=(await faceapi.detectAllFaces(cv,opt())).map(d=>d.box)}
 ov.width=live.clientWidth;ov.height=live.clientHeight;const k=ov.width/320;ctx.clearRect(0,0,ov.width,ov.height);ctx.lineWidth=2;ctx.font='bold 15px system-ui';
 for(const bx of boxes){let l=null,dm=1e9;for(const q of labels){const d=Math.hypot(q.x-(bx.x+bx.width/2),q.y-(bx.y+bx.height/2));if(d<dm){dm=d;l=q}}
@@ -94,6 +94,6 @@ const c=l.ok?'#2c4':'#e33';ctx.strokeStyle=c;ctx.strokeRect(bx.x*k,bx.y*k,bx.wid
 const w=ctx.measureText(l.name).width+8;ctx.fillStyle=c;ctx.fillRect(bx.x*k,bx.y*k-22,w,22);ctx.fillStyle='#fff';ctx.fillText(l.name,bx.x*k+4,bx.y*k-6)}
 $('fs').textContent='pronto'}
 catch(e){$('fs').textContent='erro: '+e.message;return setTimeout(detect,2000)}
-setTimeout(detect,0)}
+setTimeout(detect,Math.max(200,(performance.now()-t0)*2))}
 window.addEventListener('load',init);
 </script></body></html>)HTML";
