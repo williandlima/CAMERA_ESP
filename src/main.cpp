@@ -5,11 +5,12 @@
 #include <img_converters.h>
 #include <esp_random.h>
 #include <time.h>
-#if USE_SD
-#include <SD_MMC.h>
-#endif
 #include "config.h"
 #include "secrets.h"
+#if USE_SD
+#include <FS.h>
+#include <SD_MMC.h>
+#endif
 #include "page.h"
 
 // ---------- estado compartilhado ----------
