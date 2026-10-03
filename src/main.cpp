@@ -5,6 +5,7 @@
 #include <img_converters.h>
 #include <esp_random.h>
 #include <esp_http_server.h>
+#include <Preferences.h>
 #include <time.h>
 #include "config.h"
 #include "secrets.h"
@@ -26,6 +27,8 @@ static SemaphoreHandle_t mtx;
 static volatile bool motionNow = false;
 static volatile int motionPct = 0;
 static bool sdOk = false;
+static volatile bool captureEnabled = true;   // tirar foto ao detectar movimento
+static Preferences prefs;
 
 static String sessions[SESSION_MAX];
 static uint8_t sessNext = 0;
@@ -91,7 +94,7 @@ static void detectMotion(const uint8_t *jpg, size_t len) {
   memcpy(prevFrame, curFrame, MW * MH * 2);
   motionPct = changed * 100 / (MW * MH);
   motionNow = motionPct >= MOTION_AREA_PERCENT;
-  if (motionNow && millis() - lastTrigger > MOTION_COOLDOWN_MS) {
+  if (motionNow && captureEnabled && millis() - lastTrigger > MOTION_COOLDOWN_MS) {
     lastTrigger = millis();
     saveSnapshot(jpg, len);
   }
@@ -233,7 +236,7 @@ static void startStreamServer() {
 
 static void handleEvents() {
   if (!requireAuth()) return;
-  String j = String("{\"motion\":") + (motionNow ? "true" : "false") + ",\"pct\":" + motionPct + ",\"events\":[";
+  String j = String("{\"motion\":") + (motionNow ? "true" : "false") + ",\"capture\":" + (captureEnabled ? "true" : "false") + ",\"pct\":" + motionPct + ",\"events\":[";
   bool first = true;
   xSemaphoreTake(mtx, portMAX_DELAY);
   for (uint32_t id = snapCounter; id > 0 && id + MAX_SNAPSHOTS > snapCounter; id--) {
@@ -249,6 +252,15 @@ static void handleEvents() {
   j += "]}";
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", j);
+}
+
+static void handleSettings() {
+  if (!requireAuth()) return;
+  if (server.hasArg("capture")) {
+    captureEnabled = server.arg("capture") == "1";
+    prefs.putBool("capture", captureEnabled);
+  }
+  server.send(200, "application/json", String("{\"capture\":") + (captureEnabled ? "true" : "false") + "}");
 }
 
 static void handleEvent() {
@@ -270,6 +282,8 @@ static void handleRoot() {
 void setup() {
   Serial.begin(115200);
   mtx = xSemaphoreCreateMutex();
+  prefs.begin("cam", false);
+  captureEnabled = prefs.getBool("capture", true);
   if (!psramFound() || !initCamera()) { Serial.println("Falha na camera/PSRAM"); delay(5000); ESP.restart(); }
   prevFrame = (uint8_t *)ps_malloc(MW * MH * 2);
   curFrame = (uint8_t *)ps_malloc(MW * MH * 2);
@@ -294,6 +308,7 @@ void setup() {
   server.on("/logout", HTTP_GET, handleLogout);
   server.on("/live.jpg", HTTP_GET, handleLive);
   server.on("/events", HTTP_GET, handleEvents);
+  server.on("/settings", HTTP_POST, handleSettings);
   server.on("/event.jpg", HTTP_GET, handleEvent);
   server.begin();
   startStreamServer();

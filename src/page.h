@@ -23,15 +23,16 @@ header{display:flex;justify-content:space-between;align-items:center}a{color:#8a
 .g figure{margin:0;background:#1c1c1c;border-radius:8px;overflow:hidden}.g img{width:100%;display:block}
 .g figcaption{padding:6px;font-size:13px}</style></head><body>
 <header><h2>Monitor de ambiente</h2><a href="/logout">Sair</a></header>
-<img id="live" alt="ao vivo"><div><span id="st">Sem movimento</span></div>
+<img id="live" alt="ao vivo"><div><span id="st">Sem movimento</span> <label style="margin-left:12px"><input type="checkbox" id="cap"> Tirar foto ao detectar movimento</label></div>
 <h3>Movimentos detectados</h3><div class="g" id="g"></div>
 <script>
 const live=document.getElementById('live');
 function start(){live.src='http://'+location.hostname+':81/stream?'+Date.now()}
 live.onerror=()=>setTimeout(start,2000);start();
 let last=0;
+document.getElementById('cap').onchange=e=>fetch('/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'capture='+(e.target.checked?1:0)});
 async function poll(){try{const r=await fetch('/events');if(r.status==401)return location.reload();
-const d=await r.json();const st=document.getElementById('st');
+const d=await r.json();const cb=document.getElementById('cap');if(document.activeElement!==cb)cb.checked=d.capture;const st=document.getElementById('st');
 st.textContent=d.motion?'Movimento! ('+d.pct+'%)':'Sem movimento';st.className=d.motion?'m':'';
 const top=d.events.length?d.events[0].id:0;
 if(top!==last){last=top;document.getElementById('g').innerHTML=d.events.map(e=>
