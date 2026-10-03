@@ -40,9 +40,12 @@ void update() {
       show(v, 0, v);
       break;
     default:
-      if (knownActive()) show(0, v, 0);
-      else s_knownHold = 0;  // expirou: zera para não reativar quando millis() der a volta
-      else show(v, 0, 0);
+      if (knownActive()) {
+        show(0, v, 0);
+      } else {
+        s_knownHold = 0;  // expirou: zera para não reativar quando millis() der a volta
+        show(v, 0, 0);
+      }
       break;
   }
 }
