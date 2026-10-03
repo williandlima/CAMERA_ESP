@@ -20,6 +20,11 @@ void knownFace(uint16_t holdMs) {
 }
 
 static void show(uint8_t r, uint8_t g, uint8_t b) {
+#if LED_SWAP_RG
+  const uint8_t t = r;  // compensa LED com ordem de cores diferente
+  r = g;
+  g = t;
+#endif
   const uint32_t c = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
   if (c == s_lastColor) return;  // evita reescrever o WS2812 à toa
   s_lastColor = c;

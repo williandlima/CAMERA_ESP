@@ -35,6 +35,9 @@
 
 // ---------- LED RGB (WS2812) ----------
 #define LED_PIN        48
+// Alguns LEDs desta placa recebem vermelho e verde invertidos (ordem RGB em vez de GRB).
+// Se "liberado" acender vermelho e o normal acender verde, troque para 0.
+#define LED_SWAP_RG    1
 
 // ---------- Rede ----------
 #define HOSTNAME       "esp32cam"   // http://esp32cam.local/
