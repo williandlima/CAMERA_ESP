@@ -20,7 +20,15 @@ void begin() {
   s_prefs.begin("cam", false);
   Settings stored;
   const size_t n = s_prefs.getBytes("cfg", &stored, sizeof(stored));
-  if (n == sizeof(stored) && stored.version == Settings().version) s_cfg = stored;
+  if (n == sizeof(stored) && stored.version == Settings().version) {
+    s_cfg = stored;
+  } else if (n == sizeof(stored) && stored.version == 3) {
+    // v3 -> v4: mantém os ajustes do usuário; só encurta o tempo do LED verde
+    s_cfg = stored;
+    s_cfg.version = Settings().version;
+    s_cfg.knownHoldMs = Settings().knownHoldMs;
+    save();
+  }
   // migração da v1: opção "capture" salva isoladamente
   if (n == 0 && s_prefs.isKey("capture")) s_cfg.motion.capture = s_prefs.getBool("capture", true);
 }

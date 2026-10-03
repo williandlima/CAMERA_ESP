@@ -25,11 +25,11 @@ struct MotionSettings {
 };
 
 struct Settings {
-  uint32_t version = 3;
+  uint32_t version = 4;
   CameraSettings cam;
   MotionSettings motion;
   uint8_t ledBrightness = 25;
-  uint16_t knownHoldMs = 5000;
+  uint16_t knownHoldMs = 2500;  // LED verde após o último rosto conhecido
 };
 
 namespace SettingsStore {

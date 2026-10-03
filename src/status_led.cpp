@@ -8,12 +8,16 @@
 namespace StatusLed {
 
 static volatile Mode s_mode = Mode::Connecting;
-static volatile uint32_t s_knownUntil = 0;
+static volatile uint32_t s_knownAt = 0;     // millis() do último rosto conhecido
+static volatile uint16_t s_knownHold = 0;   // 0 = nenhum ainda
 static uint32_t s_lastColor = 0xFFFFFFFF;
 
 void begin() { neopixelWrite(LED_PIN, 0, 0, 0); }
 void setMode(Mode m) { s_mode = m; }
-void knownFace(uint16_t holdMs) { s_knownUntil = millis() + holdMs; }
+void knownFace(uint16_t holdMs) {
+  s_knownAt = millis();
+  s_knownHold = holdMs;
+}
 
 static void show(uint8_t r, uint8_t g, uint8_t b) {
   const uint32_t c = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
@@ -21,6 +25,9 @@ static void show(uint8_t r, uint8_t g, uint8_t b) {
   s_lastColor = c;
   neopixelWrite(LED_PIN, r, g, b);
 }
+
+// Subtração sem sinal: correta mesmo quando millis() dá a volta (49 dias).
+bool knownActive() { return s_knownHold && (millis() - s_knownAt) < s_knownHold; }
 
 void update() {
   const uint8_t v = SettingsStore::get().ledBrightness;
@@ -33,7 +40,8 @@ void update() {
       show(v, 0, v);
       break;
     default:
-      if ((int32_t)(s_knownUntil - now) > 0) show(0, v, 0);
+      if (knownActive()) show(0, v, 0);
+      else s_knownHold = 0;  // expirou: zera para não reativar quando millis() der a volta
       else show(v, 0, 0);
       break;
   }

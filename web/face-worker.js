@@ -19,7 +19,7 @@ const config = (base) => ({
   filter: { enabled: false },
   face: {
     enabled: true,
-    detector: { rotation: false, maxDetected: 5, minConfidence: 0.45, return: false },
+    detector: { rotation: false, maxDetected: 5, minConfidence: 0.6, minSize: 24, return: false },
     mesh: { enabled: true },
     attention: { enabled: false },
     iris: { enabled: false },
@@ -72,15 +72,31 @@ function setDb(faces) {
   }
 }
 
+// Compara com cada pessoa (não com cada amostra): usa a média das 2 melhores
+// amostras dela, o que impede que uma única amostra ruim do cadastro "case" com tudo.
+// Retorna também a 2ª melhor pessoa para exigir margem de separação.
 function match(embedding) {
   if (!embedding || !embeddings.length) return null;
-  const same = embeddings.filter((e) => e.length === embedding.length);
-  if (!same.length) return null;
-  const idx = [];
-  embeddings.forEach((e, i) => { if (e.length === embedding.length) idx.push(i); });
-  const r = human.match.find(embedding, same);
-  if (r.index < 0) return null;
-  return { name: names[idx[r.index]], similarity: r.similarity };
+  const perPerson = new Map();
+  for (let i = 0; i < embeddings.length; i++) {
+    if (embeddings[i].length !== embedding.length) continue;
+    const s = human.match.similarity(embedding, embeddings[i]);
+    if (!perPerson.has(names[i])) perPerson.set(names[i], []);
+    perPerson.get(names[i]).push(s);
+  }
+  let best = null, second = 0;
+  for (const [name, sims] of perPerson) {
+    sims.sort((a, b) => b - a);
+    const score = sims.length > 1 ? (sims[0] + sims[1]) / 2 : sims[0];
+    if (!best || score > best.similarity) {
+      if (best) second = Math.max(second, best.similarity);
+      best = { name, similarity: score };
+    } else {
+      second = Math.max(second, score);
+    }
+  }
+  if (best) best.second = second;
+  return best;
 }
 
 async function detect(msg) {

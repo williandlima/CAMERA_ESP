@@ -70,6 +70,7 @@ with sync_playwright() as p:
     page.wait_for_function("fr.tracks.length > 0 && fr.tracks.every(t => trackLabel(t) !== 'Teste')", timeout=120000)
     time.sleep(12)
     labels = page.evaluate("fr.tracks.map(t => [trackLabel(t), +t.similarity.toFixed(2)])")
+    ok(page.evaluate("fr.tracks.length") <= 1, "sem caixas fantasmas da pessoa anterior")
     ok(all(l[0] != "Teste" for l in labels), f"outra pessoa nao confundida: {labels}")
     page.screenshot(path=os.path.join(SHOTS, "unknown.png"))
 
@@ -84,9 +85,14 @@ with sync_playwright() as p:
     ok(page.locator("#gallery figure").count() == 1, "print manual aparece na galeria")
 
     # sem rosto -> tracks somem
+    start = page.evaluate("fr.frameId")
     urllib.request.urlopen(BASE + "/mock/scene?s=sceneEmpty.jpg")
-    page.wait_for_function("fr.tracks.length === 0", timeout=60000)
-    ok(True, "sem rosto -> sem caixas")
+    page.wait_for_function(f"fr.frameId >= {start} + 3 && !fr.busy", timeout=120000)
+    ok(page.evaluate("fr.tracks.length") == 0, "pessoa saiu -> nome some em ate 3 analises")
+    k0 = mock("/mock/state")["known"]
+    start = page.evaluate("fr.frameId")
+    page.wait_for_function(f"fr.frameId >= {start} + 3 && !fr.busy", timeout=120000)
+    ok(mock("/mock/state")["known"] == k0, "pessoa saiu -> placa para de receber 'rosto conhecido' (LED volta ao vermelho)")
 
     page.set_viewport_size({"width": 390, "height": 844})
     urllib.request.urlopen(BASE + "/mock/scene?s=sceneA.jpg"); time.sleep(3)

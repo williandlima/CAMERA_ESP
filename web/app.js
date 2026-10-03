@@ -30,7 +30,13 @@ function loadPrefs() {
 function savePrefs(p) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (_) { /* modo privado */ }
 }
-const prefs = { threshold: 0.55, fps: 6, antispoof: true, recognize: true, showMotion: true, tab: 'faces', ...loadPrefs() };
+const prefs = { threshold: 0.6, fps: 6, antispoof: true, recognize: true, showMotion: true, tab: 'faces', ...loadPrefs() };
+if ((prefs.v || 1) < 2) { prefs.threshold = Math.max(prefs.threshold, 0.6); prefs.v = 2; } // limiar antigo era permissivo demais
+
+// Critérios de reconhecimento (ver updateTracks)
+const MIN_FACE_SCORE = 0.6;  // qualidade mínima do rosto para tentar identificar
+const MIN_MARGIN = 0.06;     // vantagem mínima sobre a 2ª pessoa mais parecida
+const MAX_MISSED = 2;        // análises seguidas sem ver o rosto até apagar a caixa
 
 // ---------------------------------------------------------------- vídeo
 const live = $('#live');
@@ -99,6 +105,7 @@ function renderSystem(s) {
     ['PSRAM livre', `${Math.round(s.psram / 1024)} KB`], ['Espectadores', s.clients],
     ['Cartão SD', s.sd.ok ? `${s.sd.used} / ${s.sd.total} MB` : 'ausente'],
     ['Eventos', s.motion.events],
+    ['LED', s.known ? 'verde (rosto conhecido)' : 'vermelho'],
   ];
   $('#sys').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
@@ -339,7 +346,7 @@ $('#fr-enroll').onclick = () => {
   frMsg.textContent = 'Olhe para a câmera e mova levemente a cabeça…';
 };
 
-function handleEnroll(cand) {
+function handleEnroll(cand, faceCount) {
   const en = fr.enroll;
   if (!en) return;
   if (Date.now() > en.deadline) {
@@ -348,7 +355,8 @@ function handleEnroll(cand) {
     return;
   }
   if (!cand || Date.now() < en.next) return;
-  if (cand.score < 0.6 || cand.box[2] < 0.08) { frMsg.textContent = 'Aproxime-se e fique de frente para a câmera.'; return; }
+  if (faceCount !== 1) { frMsg.textContent = 'Deixe apenas a pessoa a cadastrar na imagem.'; return; }
+  if (cand.score < 0.75 || cand.box[2] < 0.1) { frMsg.textContent = 'Aproxime-se, fique de frente e com boa luz.'; return; }
   en.samples.push(cand.emb);
   en.next = Date.now() + 350; // espaça as amostras para variar o ângulo
   en.deadline = Date.now() + 15000; // progresso renova o prazo (aparelhos lentos)
@@ -382,13 +390,15 @@ function updateTracks(faces) {
       if (v > bestIou) { bestIou = v; best = t; }
     }
     if (!best) {
-      best = { id: fr.nextTrack++, box: f.box.slice(), target: f.box.slice(), votes: [] };
+      best = { id: fr.nextTrack++, box: f.box.slice(), target: f.box.slice(), votes: [], missed: 0 };
       fr.tracks.push(best);
     }
     used.add(best);
     best.target = f.box.slice();
     best.seen = now;
-    const ok = f.match && f.match.similarity >= prefs.threshold;
+    best.missed = 0;
+    const ok = f.match && f.score >= MIN_FACE_SCORE && f.match.similarity >= prefs.threshold &&
+      f.match.similarity - (f.match.second || 0) >= MIN_MARGIN;
     best.votes.push(ok ? f.match.name : null);
     if (best.votes.length > 5) best.votes.shift();
     best.similarity = f.match ? f.match.similarity : 0;
@@ -397,7 +407,10 @@ function updateTracks(faces) {
     best.real = ema(best.real, f.real);
     best.live = ema(best.live, f.live);
   }
-  fr.tracks = fr.tracks.filter((t) => now - t.seen < 1500);
+  // Rosto que sumiu: apaga após MAX_MISSED análises sem ele (não por tempo, que
+  // deixava o nome "pendurado" quando cada análise demora).
+  for (const t of fr.tracks) if (!used.has(t)) t.missed++;
+  fr.tracks = fr.tracks.filter((t) => t.missed < MAX_MISSED && now - t.seen < 4000);
 }
 
 function trackLabel(t) {
@@ -405,7 +418,8 @@ function trackLabel(t) {
   for (const v of t.votes) if (v) c[v] = (c[v] || 0) + 1;
   let name = null, n = 0;
   for (const k of Object.keys(c)) if (c[k] > n) { n = c[k]; name = k; }
-  return n * 2 >= t.votes.length ? name : null;
+  // nome só com maioria clara (≥ 60%) e pelo menos 2 votos
+  return n >= 2 && n >= t.votes.length * 0.6 ? name : null;
 }
 
 const SPOOF_MIN = 0.4;
@@ -414,7 +428,8 @@ const isGenuine = (t) => !prefs.antispoof || ((t.real ?? 1) >= SPOOF_MIN && (t.l
 function signalKnown() {
   const now = Date.now();
   if (now - fr.lastKnownPost < 1000) return;
-  if (!fr.tracks.some((t) => trackLabel(t) && isGenuine(t))) return;
+  // só rostos vistos na análise mais recente (missed === 0) mantêm o LED verde
+  if (!fr.tracks.some((t) => t.missed === 0 && trackLabel(t) && isGenuine(t))) return;
   fr.lastKnownPost = now;
   api('/api/known', { method: 'POST' }).catch(() => {});
 }
@@ -462,7 +477,7 @@ function onWorkerMessage(ev) {
   } else if (m.type === 'result') {
     fr.busy = false;
     updateTracks(m.faces);
-    handleEnroll(m.enroll);
+    handleEnroll(m.enroll, m.faces.length);
     signalKnown();
     frStatus.textContent = `Pronto · ${m.ms} ms por análise · ${m.faces.length} rosto(s)`;
     // Ritmo adaptativo: respeita o fps escolhido e não ocupa mais de ~60% do tempo

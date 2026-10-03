@@ -9,4 +9,5 @@ void begin();
 void setMode(Mode m);
 void knownFace(uint16_t holdMs);  // verde por holdMs
 void update();                    // chamar no loop
+bool knownActive();
 }  // namespace StatusLed

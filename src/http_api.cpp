@@ -212,6 +212,7 @@ static esp_err_t handleStatus(httpd_req_t *req) {
   JsonArray box = mo["box"].to<JsonArray>();
   for (float v : m.box) box.add(roundf(v * 1000) / 1000);
   d["lastEvent"] = SnapshotStore::lastId();
+  d["known"] = StatusLed::knownActive();
   String s;
   serializeJson(d, s);
   return sendJson(req, s);

@@ -45,7 +45,7 @@ class Api(BaseHTTPRequestHandler):
             return self.send(200, {"fw": "2.0.0-mock", "sensor": "OV2640", "uptime": 3725, "time": int(time.time()), "fps": 14.8, "rssi": -58,
                 "ip": "127.0.0.1", "heap": 180000, "psram": 7000000, "temp": 41.5, "clients": 1, "sd": {"ok": False, "used": 0, "total": 0},
                 "motion": {"enabled": True, "capture": True, "active": True, "light": False, "percent": 4.2, "events": 3, "box": [0.2, 0.1, 0.6, 0.7]},
-                "lastEvent": len(state["events"])})
+                "lastEvent": len(state["events"]), "known": False})
         if p == "/api/events": return self.send(200, [{"id": i + 1, "time": int(time.time()), "percent": 4.2, "manual": m} for i, m in reversed(list(enumerate(state["events"])))])
         if p in ("/api/snapshot", "/api/frame.jpg"): return self.send(200, frame(), "image/jpeg")
         if p == "/api/settings": return self.send(200, state["settings"])
