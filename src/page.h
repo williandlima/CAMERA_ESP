@@ -79,7 +79,8 @@ async function full(){cx.drawImage(live,0,0,320,240);
 res=await faceapi.detectAllFaces(cv,opt()).withFaceLandmarks().withFaceDescriptors();
 labels=res.map(r=>{const b=r.detection.box;let name='Desconhecido',ok=false;
 if(matcher){const m=matcher.findBestMatch(r.descriptor);if(m.label!=='unknown'){name=m.label+' '+m.distance.toFixed(2);ok=true}}
-return{x:b.x+b.width/2,y:b.y+b.height/2,name,ok}});lastFull=Date.now()}
+return{x:b.x+b.width/2,y:b.y+b.height/2,name,ok}});lastFull=Date.now();
+if(labels.some(l=>l.ok))fetch('/known',{method:'POST'}).catch(()=>{})}
 async function detect(){
 const ctx=ov.getContext('2d');
 if(!$('fr').checked||!live.naturalWidth||document.hidden){ctx.clearRect(0,0,ov.width,ov.height);res=[];return setTimeout(detect,500)}

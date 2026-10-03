@@ -30,6 +30,8 @@ static volatile int motionPct = 0;
 static bool sdOk = false;
 static volatile bool captureEnabled = true;   // tirar foto ao detectar movimento
 static Preferences prefs;
+static volatile uint32_t knownUntil = 0;   // millis() até quando o LED fica verde
+static int ledState = -1;
 
 static String sessions[SESSION_MAX];
 static uint8_t sessNext = 0;
@@ -294,6 +296,20 @@ static void handleFacesPost() {
   server.send(200, "application/json", "{}");
 }
 
+static void handleKnown() {   // a página avisa que viu um rosto conhecido
+  if (!requireAuth()) return;
+  knownUntil = millis() + KNOWN_HOLD_MS;
+  server.send(204);
+}
+
+static void updateLed() {
+  int st = (knownUntil && (int32_t)(knownUntil - millis()) > 0) ? 1 : 0;
+  if (st == ledState) return;
+  ledState = st;
+  if (st) neopixelWrite(LED_PIN, 0, LED_BRIGHT, 0);   // verde: rosto conhecido
+  else    neopixelWrite(LED_PIN, LED_BRIGHT, 0, 0);   // vermelho: normal
+}
+
 static void handleEvent() {
   if (!requireAuth()) return;
   uint32_t id = server.arg("id").toInt();
@@ -312,6 +328,7 @@ static void handleRoot() {
 // ---------- setup / loop ----------
 void setup() {
   Serial.begin(115200);
+  neopixelWrite(LED_PIN, LED_BRIGHT, 0, 0);
   mtx = xSemaphoreCreateMutex();
   prefs.begin("cam", false);
   LittleFS.begin(true);
@@ -343,6 +360,7 @@ void setup() {
   server.on("/settings", HTTP_POST, handleSettings);
   server.on("/faces", HTTP_GET, handleFacesGet);
   server.on("/faces", HTTP_POST, handleFacesPost);
+  server.on("/known", HTTP_POST, handleKnown);
   server.on("/event.jpg", HTTP_GET, handleEvent);
   server.begin();
   startStreamServer();
@@ -353,6 +371,7 @@ void setup() {
 void loop() {
   if (WiFi.status() != WL_CONNECTED) { WiFi.reconnect(); delay(2000); }
   server.handleClient();
+  updateLed();
   static uint32_t lastIp = 0;
   if (millis() - lastIp > 10000) {
     lastIp = millis();

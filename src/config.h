@@ -33,3 +33,8 @@
 #define MAX_SNAPSHOTS  8            // prints guardados na PSRAM
 #define SESSION_MAX    4            // sessões simultâneas
 #define TZ_INFO        "<-03>3"     // Brasília
+
+// LED RGB (WS2812) da placa
+#define LED_PIN        48           // GOOUUU ESP32-S3-CAM: GPIO48
+#define LED_BRIGHT     25           // 0-255
+#define KNOWN_HOLD_MS  5000         // tempo em verde após ver rosto conhecido
