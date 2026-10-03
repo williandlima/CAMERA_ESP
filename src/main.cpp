@@ -319,5 +319,10 @@ void setup() {
 void loop() {
   if (WiFi.status() != WL_CONNECTED) { WiFi.reconnect(); delay(2000); }
   server.handleClient();
+  static uint32_t lastIp = 0;
+  if (millis() - lastIp > 10000) {
+    lastIp = millis();
+    Serial.printf("IP: http://%s/  (stream porta 81)\n", WiFi.localIP().toString().c_str());
+  }
   delay(2);
 }
