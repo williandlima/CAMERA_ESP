@@ -17,3 +17,13 @@ Página web protegida por senha com imagem ao vivo, detecção de movimento e pr
 Ajuste pinos, sensibilidade e fuso em `src/config.h`.
 Obs.: HTTP sem TLS – use apenas em rede local confiável (ou atrás de VPN/proxy HTTPS).
 Obs.: o código não foi compilado/testado em hardware nesta sessão (sem acesso à rede para baixar o toolchain).
+
+## Reconhecimento facial (no PC)
+O ESP32 só transmite o vídeo; o PC lê o stream, detecta rostos (YuNet), identifica (SFace) e escreve o nome na imagem.
+```
+cd recognizer
+pip install -r requirements.txt
+# coloque fotos em known_faces/ (Willian.jpg, Maria.jpg ...)
+python recognize.py --host <IP_DA_PLACA> --password <WEB_PASSWORD> [--serve]
+```
+`--serve` publica o vídeo anotado em `http://<ip-do-pc>:5000/` (senha = WEB_PASSWORD). Os modelos ONNX são baixados na primeira execução.
