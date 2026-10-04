@@ -16,6 +16,7 @@
 #include "settings.h"
 #include "snapshot_store.h"
 #include "status_led.h"
+#include "vpn_service.h"
 #include "stream_server.h"
 
 namespace HttpApi {
@@ -213,6 +214,7 @@ static esp_err_t handleStatus(httpd_req_t *req) {
   for (float v : m.box) box.add(roundf(v * 1000) / 1000);
   d["lastEvent"] = SnapshotStore::lastId();
   d["known"] = StatusLed::knownActive();
+  d["vpn"] = VpnService::up();
   String s;
   serializeJson(d, s);
   return sendJson(req, s);

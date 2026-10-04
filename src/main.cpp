@@ -16,6 +16,7 @@
 #include "http_api.h"
 #include "motion_service.h"
 #include "net_service.h"
+#include "vpn_service.h"
 #include "secrets.h"
 #include "settings.h"
 #include "snapshot_store.h"
@@ -49,6 +50,7 @@ void setup() {
   CameraService::startTask();
 
   NetService::begin();
+  VpnService::begin();
   HttpApi::begin();
   StreamServer::begin();
   enableLoopWDT();

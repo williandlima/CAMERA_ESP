@@ -7,6 +7,7 @@
 
 #include "auth_service.h"
 #include "config.h"
+#include "vpn_service.h"
 #include "frame_hub.h"
 
 namespace StreamServer {
@@ -56,7 +57,7 @@ static bool header(const char *req, const char *name, char *out, size_t outLen) 
   return false;
 }
 
-// Libera CORS só para a própria placa (IP ou nome mDNS), em qualquer porta.
+// Libera CORS só para a própria placa (IP, IP da VPN ou nome mDNS), em qualquer porta.
 static bool originAllowed(const char *origin) {
   if (strncmp(origin, "http://", 7)) return false;
   const char *host = origin + 7;
@@ -64,7 +65,9 @@ static bool originAllowed(const char *origin) {
   const size_t hl = end ? (size_t)(end - host) : strlen(host);
   const String ip = WiFi.localIP().toString();
   const String mdns = String(HOSTNAME) + ".local";
+  const char *vpn = VpnService::ip();  // acesso pelo túnel WireGuard
   return (hl == ip.length() && strncmp(host, ip.c_str(), hl) == 0) ||
+         (*vpn && hl == strlen(vpn) && strncmp(host, vpn, hl) == 0) ||
          (hl == mdns.length() && strncasecmp(host, mdns.c_str(), hl) == 0);
 }
 

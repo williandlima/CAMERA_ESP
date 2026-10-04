@@ -78,5 +78,5 @@ Todas as rotas exigem login, exceto `/api/login`.
 
 - **Internet no aparelho:** o reconhecimento facial roda no navegador e baixa os modelos (~10 MB, ficam em cache) do jsDelivr. O aparelho que abre a página precisa de internet; a câmera não.
 - **Cadastros antigos:** os rostos cadastrados na versão anterior (face-api) não são compatíveis. Cadastre as pessoas de novo.
-- **Rede:** a conexão é HTTP sem TLS. Use só em rede local confiável ou por VPN (por exemplo, Tailscale). Não exponha as portas 80 e 81 na internet.
+- **Rede:** a conexão é HTTP sem TLS. Use só em rede local confiável ou por VPN (por exemplo, Tailscale). Não exponha as portas 80 e 81 na internet. Para acesso de fora sem computador ligado, a câmera tem cliente WireGuard embutido: veja [docs/ACESSO_REMOTO.md](docs/ACESSO_REMOTO.md).
 - **Antifraude:** reduz, mas não elimina, a chance de uma foto enganar o reconhecimento. Não use como controle de acesso.
