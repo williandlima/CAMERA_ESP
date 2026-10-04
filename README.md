@@ -31,6 +31,7 @@ Depois, abra **http://esp32cam.local/** ou o IP mostrado no monitor.
 | Movimento | Fundo adaptativo, compensação de auto-exposição, filtro de ruído, ignora acender/apagar luz, confirmação em N quadros, área do movimento desenhada no vídeo |
 | Prints | Galeria com os últimos 12 na memória. No cartão SD (`/motion`), as gravações mais antigas são apagadas acima de 90% de uso |
 | Rostos | Detecção e reconhecimento no navegador (Human/FaceRes em Web Worker), cadastro com 5 amostras, nome estável por votação e antifraude contra foto ou tela |
+| Telegram | Foto no celular quando há movimento e comandos `/foto`, `/status` (de qualquer rede, sem servidor): [docs/TELEGRAM.md](docs/TELEGRAM.md) |
 | LED | Azul piscando = conectando; vermelho = normal; verde = rosto conhecido; roxo = atualizando |
 | Ajustes | Resolução, qualidade, brilho, contraste, espelhar/inverter, sensibilidade e intervalo dos prints, salvos na placa |
 | Segurança | Sessão por cookie `HttpOnly`/`SameSite=Strict` com expiração, senha comparada em tempo constante, bloqueio progressivo após erros, CORS restrito à própria placa |

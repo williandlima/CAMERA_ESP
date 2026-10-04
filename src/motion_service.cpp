@@ -9,6 +9,7 @@
 #include "config.h"
 #include "motion.h"
 #include "snapshot_store.h"
+#include "telegram_service.h"
 
 namespace MotionService {
 
@@ -141,6 +142,7 @@ void onFrame(const FramePtr &f) {
   xSemaphoreGive(s_mtx);
 
   s_wasMotion = r.motion;
+  if (r.motion) TelegramService::onMotion(f, r.percent);  // alerta no celular (independe de salvar prints)
   const uint32_t now = millis();
   if (r.motion && s_cfg.capture && (s_lastShotMs == 0 || now - s_lastShotMs >= s_cfg.cooldownS * 1000UL)) {
     s_lastShotMs = now;

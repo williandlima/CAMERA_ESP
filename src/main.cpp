@@ -16,6 +16,7 @@
 #include "http_api.h"
 #include "motion_service.h"
 #include "net_service.h"
+#include "telegram_service.h"
 #include "vpn_service.h"
 #include "secrets.h"
 #include "settings.h"
@@ -51,6 +52,7 @@ void setup() {
 
   NetService::begin();
   VpnService::begin();
+  TelegramService::begin();
   HttpApi::begin();
   StreamServer::begin();
   enableLoopWDT();

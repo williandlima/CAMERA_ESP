@@ -26,8 +26,8 @@ jobs:
       - name: Compilar firmware
         run: |
           cp src/secrets.h.example src/secrets.h
-          # liga o acesso remoto para compilar tambem o cliente WireGuard
-          sed -i 's|^// #define WG_|#define WG_|' src/secrets.h
+          # liga os opcionais para compilar tambem WireGuard e Telegram
+          sed -i -E 's,^// #define (WG|TG)_,#define \1_,' src/secrets.h
           pio run -e goouuu_esp32s3_cam
       - uses: actions/upload-artifact@v4
         with:
